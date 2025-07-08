@@ -122,6 +122,7 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
             "winner": "no_show",
             "player_combo": combo_p,
             "dealer_combo": "",
+            "dealer_hand": dealer,
             "ak_bonus": False,
             "second_combo": None,
             "insurance_win": insurance_payout,
@@ -148,6 +149,7 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
         "winner": "player" if score_p > score_d else "tie" if score_p == score_d else "dealer",
         "player_combo": combo_p,
         "dealer_combo": combo_d,
+        "dealer_hand": dealer,
         "ak_bonus": ak_bonus,
         "second_combo": second_combo,
         "insurance_win": insurance_payout,
@@ -172,14 +174,14 @@ def streamlit_app():
             player_hand_strs.append(selected)
 
     player_hand = [Card(c[:-1], c[-1]) for c in player_hand_strs]
-    for c in player_hand:
-        deck.cards.remove(c)
 
     st.subheader("🂠 Kasa Açık Kartını Seç")
     dealer_open_card_str = st.selectbox("Kasa Açık Kartı", options=[c for c in all_cards if c not in player_hand_strs], key="dealer_open")
     dealer_open_card = Card(dealer_open_card_str[:-1], dealer_open_card_str[-1])
-    deck.cards.remove(dealer_open_card)
 
+    # Bu kartları en sona çıkar ki hem oyuncu hem kasa seçiminde aynı kart seçilmesin
+    used_cards = player_hand + [dealer_open_card]
+    deck.cards = [c for c in deck.cards if c not in used_cards]
     dealer_hand = [dealer_open_card] + deck.draw(4)
 
     buy = st.checkbox("Kasa açmazsa kart çektirilsin mi?", value=True)
@@ -195,15 +197,12 @@ def streamlit_app():
                 st.image(card_image(card.short()), use_container_width=True)
                 st.caption(card.short())
 
-        st.subheader("🃎 Kasa Açık Kartı")
+        st.subheader("🃎 Kasa Eli")
         cols = st.columns(5)
-        with cols[0]:
-            st.image(card_image(dealer_hand[0].short()), use_container_width=True)
-            st.caption(dealer_hand[0].short())
-        for i in range(1, 5):
+        for i, card in enumerate(result["dealer_hand"]):
             with cols[i]:
-                st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Card_back_01.svg/200px-Card_back_01.svg.png", use_container_width=True)
-                st.caption("Gizli")
+                st.image(card_image(card.short()), use_container_width=True)
+                st.caption(card.short())
 
         st.subheader("🧮 El Sonucu")
         st.write("**Kasa Elini Açtı:**", result["dealer_opens"])
