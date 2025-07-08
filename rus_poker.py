@@ -155,3 +155,69 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
         "cost": cost,
         "net_gain": net
     }
+
+def streamlit_app():
+    st.set_page_config(page_title="Rus Pokeri Simülasyonu", layout="centered")
+    st.title("🃏 Rus Pokeri El Simülatörü")
+
+    deck = Deck()
+    all_cards = [card.short() for card in deck.cards]
+
+    st.subheader("🎴 Oyuncu Elini Seç")
+    player_hand_strs = []
+    cols = st.columns(5)
+    for i in range(5):
+        with cols[i]:
+            selected = st.selectbox(f"Kart {i+1}", options=[c for c in all_cards if c not in player_hand_strs], key=f"p{i}")
+            player_hand_strs.append(selected)
+
+    player_hand = [Card(c[:-1], c[-1]) for c in player_hand_strs]
+    for c in player_hand:
+        deck.cards.remove(c)
+
+    st.subheader("🂠 Kasa Açık Kartını Seç")
+    dealer_open_card_str = st.selectbox("Kasa Açık Kartı", options=[c for c in all_cards if c not in player_hand_strs], key="dealer_open")
+    dealer_open_card = Card(dealer_open_card_str[:-1], dealer_open_card_str[-1])
+    deck.cards.remove(dealer_open_card)
+
+    dealer_hand = [dealer_open_card] + deck.draw(4)
+
+    buy = st.checkbox("Kasa açmazsa kart çektirilsin mi?", value=True)
+    insurance = st.checkbox("Sigorta yapılsın mı?", value=True)
+
+    if st.button("🕹️ Eli Oyna"):
+        result = play_hand(player_hand, dealer_hand, deck, buy=buy, insurance=insurance)
+
+        st.subheader("🎴 Oyuncu Eliniz")
+        cols = st.columns(5)
+        for i, card in enumerate(player_hand):
+            with cols[i]:
+                st.image(card_image(card.short()), use_container_width=True)
+                st.caption(card.short())
+
+        st.subheader("🃎 Kasa Açık Kartı")
+        cols = st.columns(5)
+        with cols[0]:
+            st.image(card_image(dealer_hand[0].short()), use_container_width=True)
+            st.caption(dealer_hand[0].short())
+        for i in range(1, 5):
+            with cols[i]:
+                st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Card_back_01.svg/200px-Card_back_01.svg.png", use_container_width=True)
+                st.caption("Gizli")
+
+        st.subheader("🧮 El Sonucu")
+        st.write("**Kasa Elini Açtı:**", result["dealer_opens"])
+        st.write("**Kasa Kart Çekti:**", result["dealer_buy"])
+        st.write("**Kazanma Durumu:**", result["winner"].upper())
+        st.write("**Oyuncu Kombinasyonu:**", result["player_combo"])
+        if result["second_combo"]:
+            st.write("**İkinci Kombinasyon:**", result["second_combo"])
+        st.write("**Kasa Kombinasyonu:**", result["dealer_combo"])
+        st.write("**A–K Bonusu Var mı:**", result["ak_bonus"])
+        st.write("**Sigorta Kazanacı:**", result["insurance_win"])
+        st.metric("💰 Toplam Kazanç", f"{result['payout']:.2f} ante")
+        st.metric("💸 Toplam Maliyet", f"{result['cost']:.2f} ante")
+        st.metric("📈 Net Kar/Zarar", f"{result['net_gain']:.2f} ante")
+
+if __name__ == "__main__":
+    streamlit_app()
