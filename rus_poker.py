@@ -218,5 +218,6 @@ def streamlit_app():
         st.metric("📈 Ortalama Net Kar", f"{total_gain / sim_count:.4f} ante")
         st.metric("💰 Ortalama Ödeme", f"{total_payout / sim_count:.4f} ante")
         st.metric("💸 Ortalama Maliyet", f"{total_cost / sim_count:.4f} ante")
+
 if __name__ == "__main__":
     streamlit_app()
