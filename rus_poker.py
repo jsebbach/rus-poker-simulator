@@ -174,7 +174,7 @@ def streamlit_app():
     cols = st.columns(5)
     for i, card in enumerate(player_hand):
         with cols[i]:
-            st.image(card_image(card.short()), use_column_width=True)
+            st.image(card_image(card.short()), use_container_width=True)
             st.caption(card.short())
 
     buy = st.checkbox("Kasa açmazsa kart çektirilsin mi?", value=True)
