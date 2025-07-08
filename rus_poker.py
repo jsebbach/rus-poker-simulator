@@ -4,7 +4,7 @@ from PIL import Image
 import os
 from collections import Counter
 
-CARD_IMAGES = "cards"  # klasör içinde 52 kart görseli olmalı, örnek: AH.png, 2S.png vb.
+CARD_IMAGES = "cards"  # klasör içinde 52 kart görseli olmalı, örnek: ace_of_hearts.png, 2_of_spades.png vb.
 
 # --- Kart Sınıfı ---
 class Card:
@@ -145,7 +145,20 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
 
 # Kart görselini getir (örnek: AH, 9D)
 def card_image(code):
-    path = os.path.join(CARD_IMAGES, f"{code}.png")
+    rank_map = {
+        '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7',
+        '8': '8', '9': '9', 'T': '10', 'J': 'jack', 'Q': 'queen', 'K': 'king', 'A': 'ace'
+    }
+    suit_map = {
+        'H': 'hearts',
+        'D': 'diamonds',
+        'S': 'spades',
+        'C': 'clubs'
+    }
+    rank = rank_map[code[0]]
+    suit = suit_map[code[1]]
+    filename = f"{rank}_of_{suit}.png"
+    path = os.path.join(CARD_IMAGES, filename)
     return Image.open(path)
 
 # GUI uygulaması
@@ -180,7 +193,7 @@ def streamlit_app():
             st.write("**İkinci Kombinasyon:**", result["second_combo"])
         st.write("**Kasa Kombinasyonu:**", result["dealer_combo"])
         st.write("**A–K Bonusu Var mı:**", result["ak_bonus"])
-        st.write("**Sigorta Kazancı:**", result["insurance_win"])
+        st.write("**Sigorta Kazanacı:**", result["insurance_win"])
         st.metric("💰 Toplam Kazanç", f"{result['payout']:.2f} ante")
         st.metric("💸 Toplam Maliyet", f"{result['cost']:.2f} ante")
         st.metric("📈 Net Kar/Zarar", f"{result['net_gain']:.2f} ante")
