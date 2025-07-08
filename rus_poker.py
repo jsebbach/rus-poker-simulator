@@ -162,6 +162,11 @@ def streamlit_app():
     st.set_page_config(page_title="Rus Pokeri Simülasyonu", layout="centered")
     st.title("🃏 Rus Pokeri El Simülatörü")
 
+    if "player_hand_strs" not in st.session_state:
+        st.session_state.player_hand_strs = ["" for _ in range(5)]
+    if "dealer_open_card_str" not in st.session_state:
+        st.session_state.dealer_open_card_str = ""
+
     deck = Deck()
     all_cards = [card.short() for card in deck.cards]
 
@@ -170,16 +175,24 @@ def streamlit_app():
     cols = st.columns(5)
     for i in range(5):
         with cols[i]:
-            selected = st.selectbox(f"Kart {i+1}", options=[c for c in all_cards if c not in player_hand_strs], key=f"p{i}")
+            selected = st.selectbox(
+                f"Kart {i+1}",
+                options=[c for c in all_cards if c not in player_hand_strs and c != st.session_state.dealer_open_card_str],
+                key=f"p{i}"
+            )
             player_hand_strs.append(selected)
-
+    st.session_state.player_hand_strs = player_hand_strs
     player_hand = [Card(c[:-1], c[-1]) for c in player_hand_strs]
 
     st.subheader("🂠 Kasa Açık Kartını Seç")
-    dealer_open_card_str = st.selectbox("Kasa Açık Kartı", options=[c for c in all_cards if c not in player_hand_strs], key="dealer_open")
+    dealer_open_card_str = st.selectbox(
+        "Kasa Açık Kartı",
+        options=[c for c in all_cards if c not in player_hand_strs],
+        key="dealer_open"
+    )
+    st.session_state.dealer_open_card_str = dealer_open_card_str
     dealer_open_card = Card(dealer_open_card_str[:-1], dealer_open_card_str[-1])
 
-    # Bu kartları en sona çıkar ki hem oyuncu hem kasa seçiminde aynı kart seçilmesin
     used_cards = player_hand + [dealer_open_card]
     deck.cards = [c for c in deck.cards if c not in used_cards]
     dealer_hand = [dealer_open_card] + deck.draw(4)
