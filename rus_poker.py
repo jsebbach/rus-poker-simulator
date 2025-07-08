@@ -89,86 +89,13 @@ def classify_hand(cards):
         return (1, "One Pair")
     return (0, "High Card")
 
-def play_hand(player, dealer, deck, buy=True, insurance=True):
-    ante = 1
-    bet = 2
-    payout = 0
-    cost = ante + bet
-
-    dealer_opens = classify_hand(dealer)[0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
-
-    insurance_win = not dealer_opens
-    insurance_payout = (bet * 3 if insurance_win else 0) if insurance else 0
-    cost += (bet * 3) if insurance else 0
-
-    dealer_buy = False
-    if not dealer_opens and buy:
-        dealer_buy = True
-        worst = min(dealer, key=lambda c: c.value())
-        dealer.remove(worst)
-        dealer.append(deck.draw(1)[0])
-        dealer_opens = classify_hand(dealer)[0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
-        cost += ante
-
-    score_p, combo_p = classify_hand(player)
-    score_d, combo_d = classify_hand(dealer)
-    ak_bonus = False
-    second_combo = None
-
-    if not dealer_opens:
-        return {
-            "dealer_opens": False,
-            "dealer_buy": dealer_buy,
-            "winner": "no_show",
-            "player_combo": combo_p,
-            "dealer_combo": "",
-            "dealer_hand": dealer,
-            "ak_bonus": False,
-            "second_combo": None,
-            "insurance_win": insurance_payout,
-            "payout": insurance_payout + ante if not buy else insurance_payout,
-            "cost": cost,
-            "net_gain": insurance_payout + (ante if not buy else 0) - cost
-        }
-
-    if score_p > score_d:
-        multiplier = [1, 1, 2, 3, 4, 6, 9, 20, 50, 100][score_p]
-        payout = bet * multiplier
-        if 'A' in [c.rank for c in player] and 'K' in [c.rank for c in player] and score_p == 0:
-            ak_bonus = True
-            payout += 1
-    elif score_p == score_d:
-        payout = 0
-    else:
-        payout = 0
-
-    net = payout + insurance_payout - cost
-    return {
-        "dealer_opens": dealer_opens,
-        "dealer_buy": dealer_buy,
-        "winner": "player" if score_p > score_d else "tie" if score_p == score_d else "dealer",
-        "player_combo": combo_p,
-        "dealer_combo": combo_d,
-        "dealer_hand": dealer,
-        "ak_bonus": ak_bonus,
-        "second_combo": second_combo,
-        "insurance_win": insurance_payout,
-        "payout": payout + insurance_payout,
-        "cost": cost,
-        "net_gain": net
-    }
-
 def streamlit_app():
     st.set_page_config(page_title="Rus Pokeri Simülasyonu", layout="centered")
     st.title("🃏 Rus Pokeri El Simülatörü")
 
-    if "player_hand_strs" not in st.session_state:
-        st.session_state.player_hand_strs = ["" for _ in range(5)]
-    if "dealer_open_card_str" not in st.session_state:
-        st.session_state.dealer_open_card_str = ""
-
-    deck = Deck()
-    all_cards = [card.short() for card in deck.cards]
+    all_ranks = '23456789TJQKA'
+    all_suits = 'SHDC'
+    all_cards = [f"{r}{s}" for r in all_ranks for s in all_suits]
 
     st.subheader("🎴 Oyuncu Elini Seç")
     player_hand_strs = []
@@ -177,11 +104,10 @@ def streamlit_app():
         with cols[i]:
             selected = st.selectbox(
                 f"Kart {i+1}",
-                options=[c for c in all_cards if c not in player_hand_strs and c != st.session_state.dealer_open_card_str],
-                key=f"p{i}"
+                options=[c for c in all_cards if c not in player_hand_strs],
+                key=f"player_{i}"
             )
             player_hand_strs.append(selected)
-    st.session_state.player_hand_strs = player_hand_strs
     player_hand = [Card(c[:-1], c[-1]) for c in player_hand_strs]
 
     st.subheader("🂠 Kasa Açık Kartını Seç")
@@ -190,18 +116,19 @@ def streamlit_app():
         options=[c for c in all_cards if c not in player_hand_strs],
         key="dealer_open"
     )
-    st.session_state.dealer_open_card_str = dealer_open_card_str
     dealer_open_card = Card(dealer_open_card_str[:-1], dealer_open_card_str[-1])
 
     used_cards = player_hand + [dealer_open_card]
-    deck.cards = [c for c in deck.cards if c not in used_cards]
+    deck = Deck()
+    deck.cards = [c for c in deck.cards if c.short() not in [card.short() for card in used_cards]]
     dealer_hand = [dealer_open_card] + deck.draw(4)
 
     buy = st.checkbox("Kasa açmazsa kart çektirilsin mi?", value=True)
     insurance = st.checkbox("Sigorta yapılsın mı?", value=True)
 
     if st.button("🕹️ Eli Oyna"):
-        result = play_hand(player_hand, dealer_hand, deck, buy=buy, insurance=insurance)
+        from copy import deepcopy
+        result = play_hand(deepcopy(player_hand), deepcopy(dealer_hand), deck, buy=buy, insurance=insurance)
 
         st.subheader("🎴 Oyuncu Eliniz")
         cols = st.columns(5)
@@ -232,4 +159,5 @@ def streamlit_app():
         st.metric("📈 Net Kar/Zarar", f"{result['net_gain']:.2f} ante")
 
 if __name__ == "__main__":
+    from rus_poker import play_hand
     streamlit_app()
