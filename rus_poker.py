@@ -63,17 +63,12 @@ def streamlit_app():
     for c in player_hand:
         deck.cards.remove(c)
 
-    st.subheader("🎴 Kasa Elini Seç")
-    dealer_hand_strs = []
-    cols = st.columns(5)
-    for i in range(5):
-        with cols[i]:
-            selected = st.selectbox(f"Kasa Kart {i+1}", options=[c for c in all_cards if c not in player_hand_strs + dealer_hand_strs], key=f"d{i}")
-            dealer_hand_strs.append(selected)
+    st.subheader("🂠 Kasa Açık Kartını Seç")
+    dealer_open_card_str = st.selectbox("Kasa Açık Kartı", options=[c for c in all_cards if c not in player_hand_strs], key="dealer_open")
+    dealer_open_card = Card(dealer_open_card_str[:-1], dealer_open_card_str[-1])
+    deck.cards.remove(dealer_open_card)
 
-    dealer_hand = [Card(c[:-1], c[-1]) for c in dealer_hand_strs]
-    for c in dealer_hand:
-        deck.cards.remove(c)
+    dealer_hand = [dealer_open_card] + deck.draw(4)
 
     buy = st.checkbox("Kasa açmazsa kart çektirilsin mi?", value=True)
     insurance = st.checkbox("Sigorta yapılsın mı?", value=True)
