@@ -167,16 +167,15 @@ def streamlit_app():
     all_cards = [f"{r}{s}" for r in all_ranks for s in all_suits]
 
     st.subheader("🎴 Oyuncu Elini Seç")
-    player_hand_strs = []
-    cols = st.columns(5)
+    player_hand_strs = [None] * 5
     for i in range(5):
-        with cols[i]:
-            selected = st.selectbox(
-                f"Kart {i+1}",
-                options=[c for c in all_cards if c not in player_hand_strs],
-                key=f"player_{i}"
-            )
-            player_hand_strs.append(selected)
+        used = [c for c in player_hand_strs if c]
+        available_cards = [c for c in all_cards if c not in used]
+        player_hand_strs[i] = st.selectbox(
+            f"Kart {i+1}",
+            options=available_cards,
+            key=f"player_{i}"
+        )
     player_hand = [Card(c[:-1], c[-1]) for c in player_hand_strs]
 
     st.subheader("🂠 Kasa Açık Kartını Seç")
