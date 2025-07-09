@@ -3,6 +3,7 @@ import random
 from PIL import Image
 import os
 from collections import Counter
+import itertools
 
 CARD_IMAGES = "cards"
 
@@ -55,137 +56,32 @@ def card_image(code):
     path = os.path.join(CARD_IMAGES, filename)
     return Image.open(path)
 
-def classify_hand(cards):
-    values = sorted([c.value() for c in cards], reverse=True)
-    suits = [c.suit for c in cards]
-    counter = Counter(values)
-    counts = sorted(counter.values(), reverse=True)
-    unique_vals = sorted(counter.keys(), reverse=True)
+def simulate_ev(player_hand, dealer_upcard, base_deck, simulations=500, six_card=False):
+    from rus_poker import play_hand
+    total_gain = 0
 
-    is_flush = len(set(suits)) == 1
-    is_straight = all(values[i] - 1 == values[i + 1] for i in range(4))
+    for _ in range(simulations):
+        deck = Deck()
+        deck.cards = base_deck.cards.copy()
 
-    if values == [14, 5, 4, 3, 2]:
-        is_straight = True
-        values = [5, 4, 3, 2, 1]
+        # Kasa eli
+        dealer_hand = [dealer_upcard] + deck.draw(4)
 
-    if is_straight and is_flush and values[0] == 14:
-        return (9, "Royal Flush"), values
-    if is_straight and is_flush:
-        return (8, "Straight Flush"), values
-    if counts == [4, 1]:
-        return (7, "Four of a Kind"), get_rank_order(counter, [4, 1])
-    if counts == [3, 2]:
-        return (6, "Full House"), get_rank_order(counter, [3, 2])
-    if is_flush:
-        return (5, "Flush"), values
-    if is_straight:
-        return (4, "Straight"), values
-    if counts == [3, 1, 1]:
-        return (3, "Three of a Kind"), get_rank_order(counter, [3, 1, 1])
-    if counts == [2, 2, 1]:
-        return (2, "Two Pair"), get_rank_order(counter, [2, 2, 1])
-    if counts == [2, 1, 1, 1]:
-        return (1, "One Pair"), get_rank_order(counter, [2, 1, 1, 1])
-    return (0, "High Card"), values
+        if six_card:
+            player_sixth = deck.draw(1)[0]
+            full_hand = player_hand + [player_sixth]
+            all_combos = list(itertools.combinations(full_hand, 5))
+            best_result = max(
+                (play_hand(list(combo), dealer_hand.copy(), deck, buy=False, insurance=False)["net_gain"]
+                 for combo in all_combos),
+                default=0
+            )
+            total_gain += best_result
+        else:
+            result = play_hand(player_hand, dealer_hand.copy(), deck, buy=False, insurance=False)
+            total_gain += result["net_gain"]
 
-def get_rank_order(counter, pattern):
-    ordered = []
-    for count in pattern:
-        for val, cnt in counter.most_common():
-            if cnt == count and val not in ordered:
-                ordered.append(val)
-                break
-    for val in sorted(counter.keys(), reverse=True):
-        if val not in ordered:
-            ordered.append(val)
-    return ordered
-
-def compare_hands(player_score, player_vals, dealer_score, dealer_vals):
-    if player_score > dealer_score:
-        return "player"
-    elif player_score < dealer_score:
-        return "dealer"
-    else:
-        for pv, dv in zip(player_vals, dealer_vals):
-            if pv > dv:
-                return "player"
-            elif pv < dv:
-                return "dealer"
-        return "tie"
-
-def play_hand(player, dealer, deck, buy=True, insurance=True):
-    ante = 1
-    bet = 2
-    payout = 0
-    cost = ante + bet
-
-    dealer_opens = classify_hand(dealer)[0][0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
-
-    insurance_win = not dealer_opens
-    insurance_payout = (bet * 3 if insurance_win else 0) if insurance else 0
-    cost += (bet * 3) if insurance else 0
-
-    dealer_buy = False
-    if not dealer_opens and buy:
-        dealer_buy = True
-        worst = min(dealer, key=lambda c: c.value())
-        dealer.remove(worst)
-        dealer.append(deck.draw(1)[0])
-        dealer_opens = classify_hand(dealer)[0][0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
-        cost += ante
-
-    (score_p, combo_p), val_p = classify_hand(player)
-    (score_d, combo_d), val_d = classify_hand(dealer)
-
-    ak_bonus = False
-    second_combo = None
-
-    if not dealer_opens:
-        return {
-            "dealer_opens": False,
-            "dealer_buy": dealer_buy,
-            "winner": "no_show",
-            "player_combo": combo_p,
-            "dealer_combo": "",
-            "dealer_hand": dealer,
-            "ak_bonus": False,
-            "second_combo": None,
-            "insurance_win": insurance_payout,
-            "payout": insurance_payout + ante if not buy else insurance_payout,
-            "cost": cost,
-            "net_gain": insurance_payout + (ante if not buy else 0) - cost
-        }
-
-    winner = compare_hands(score_p, val_p, score_d, val_d)
-
-    if winner == "player":
-        multiplier = [1, 1, 2, 3, 4, 6, 9, 20, 50, 100][score_p]
-        payout = bet * multiplier
-        payout += ante + bet  # push
-        if 'A' in [c.rank for c in player] and 'K' in [c.rank for c in player] and score_p == 0:
-            ak_bonus = True
-            payout += 1
-    elif winner == "tie":
-        payout = ante + bet  # push
-    else:
-        payout = 0
-
-    net = payout + insurance_payout - cost
-    return {
-        "dealer_opens": dealer_opens,
-        "dealer_buy": dealer_buy,
-        "winner": winner,
-        "player_combo": combo_p,
-        "dealer_combo": combo_d,
-        "dealer_hand": dealer,
-        "ak_bonus": ak_bonus,
-        "second_combo": second_combo,
-        "insurance_win": insurance_payout,
-        "payout": payout + insurance_payout,
-        "cost": cost,
-        "net_gain": net
-    }
+    return total_gain / simulations
 
 # STREAMLIT APP
 
@@ -210,16 +106,29 @@ def streamlit_app():
     buy = st.checkbox("Kasa kart çeksin mi (Buy)?", value=True)
     insurance = st.checkbox("Sigorta yapıldı mı?", value=True)
 
+    st.subheader("Oyuncu Aksiyonu")
+    action = st.radio("Oyuncu ne yapsın?", ["Hiçbir şey yapma", "6. kartı al", "Kart değiştir"])
+
     if st.button("🟩 Eli Oyna"):
         deck = Deck()
-        # Seçilen kartları desteden çıkar
         used_cards = player_cards_input + dealer_hand
         for c in used_cards:
             if c in deck.cards:
                 deck.cards.remove(c)
 
-        # Kasaya rastgele 4 kart daha ver
         dealer_hand += deck.draw(4)
+
+        if action == "6. kartı al":
+            st.write("Simülasyon yapılıyor, lütfen bekleyin...")
+            ev_normal = simulate_ev(player_cards_input, dealer_hand[0], deck, six_card=False)
+            ev_six = simulate_ev(player_cards_input, dealer_hand[0], deck, six_card=True)
+
+            st.write(f"5 kartla beklenen kazanç: {ev_normal:.2f}")
+            st.write(f"6 kartla beklenen kazanç: {ev_six:.2f}")
+            if ev_six > ev_normal:
+                st.success("✅ 6. kart alınmalı (beklenen kazanç daha yüksek)")
+            else:
+                st.warning("🚫 6. kart alınmamalı (beklenen kazanç düşük)")
 
         result = play_hand(player_cards_input, dealer_hand, deck, buy=buy, insurance=insurance)
 
