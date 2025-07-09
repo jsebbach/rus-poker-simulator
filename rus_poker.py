@@ -87,25 +87,19 @@ def evaluate_hand(hand):
 
 def evaluate_two_combinations(hand6):
     from itertools import combinations
-    scores = []
-    best_labels = []
     five_card_combos = list(combinations(hand6, 5))
-    for combo in five_card_combos:
-        label, score = evaluate_hand(list(combo))
-        scores.append(score)
-        best_labels.append(label)
-    total_score = sum(scores)
-    return max(best_labels), total_score
+    scored = [evaluate_hand(list(combo))[1] for combo in five_card_combos]
+    scored.sort(reverse=True)
+    return "", sum(scored[:2])  # en fazla 2 kombinasyon ödemesi
 
-def simulate_options(player_hand, deck, trials=500):
+def simulate_options(player_hand, full_deck, dealer_card=None, trials=500):
     keep_score = evaluate_hand(player_hand)[1]
 
     # 6. kart alma (buy)
     buy_scores = []
     for _ in range(trials):
-        new_deck = Deck()
-        new_deck.cards = [c for c in new_deck.cards if c not in player_hand]
-        sixth_card = random.choice(new_deck.cards)
+        available_cards = [c for c in full_deck.cards if c not in player_hand and c != dealer_card]
+        sixth_card = random.choice(available_cards)
         hand6 = player_hand + [sixth_card]
         _, total_score = evaluate_two_combinations(hand6)
         buy_scores.append(total_score)
@@ -118,11 +112,10 @@ def simulate_options(player_hand, deck, trials=500):
     for combo in combinations_to_try:
         change_scores = []
         for _ in range(trials // 10):
-            new_deck = Deck()
-            new_deck.cards = [c for c in new_deck.cards if c not in player_hand]
+            available_cards = [c for c in full_deck.cards if c not in player_hand and c != dealer_card]
             new_hand = player_hand[:]
             for idx in combo:
-                new_hand[idx] = random.choice(new_deck.cards)
+                new_hand[idx] = random.choice(available_cards)
             score = evaluate_hand(new_hand)[1]
             change_scores.append(score)
         avg_score = sum(change_scores) / len(change_scores)
@@ -163,8 +156,7 @@ def streamlit_app():
     dealer_card = Card(dealer_rank, dealer_suit)
 
     if st.button("Hamle Önerisi Al"):
-        deck.cards = [c for c in deck.cards if c not in selected_cards and c != dealer_card]
-        suggestion, explanation = simulate_options(selected_cards, deck)
+        suggestion, explanation = simulate_options(selected_cards, deck, dealer_card=dealer_card)
         st.subheader("Program Önerisi")
         st.write(f"👉 **{suggestion}**")
         st.text(explanation)
