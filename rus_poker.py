@@ -87,16 +87,25 @@ def evaluate_hand(hand):
 
 def evaluate_two_combinations(hand6):
     from itertools import combinations
-    five_card_combos = list(combinations(hand6, 5))
-    combo_scores = [(evaluate_hand(list(combo))[1]) for combo in five_card_combos]
-    combo_scores.sort(reverse=True)
-    if len(combo_scores) >= 2:
-        top = combo_scores[0]
-        second = combo_scores[1] if combo_scores[1] >= PAYOUT_MULTIPLIERS["three of a kind"] else 0
-        return "", top + second
-    elif len(combo_scores) == 1:
-        return "", combo_scores[0]
-    return "", 0
+    all_combos = list(combinations(hand6, 5))
+    evaluated = []
+    for combo in all_combos:
+        label, score = evaluate_hand(list(combo))
+        evaluated.append((set(combo), score))
+
+    best = sorted(evaluated, key=lambda x: x[1], reverse=True)
+    if not best:
+        return "", 0
+
+    first_set, first_score = best[0]
+    second_score = 0
+    for second_set, score in best[1:]:
+        if first_set.isdisjoint(second_set):
+            if score >= PAYOUT_MULTIPLIERS["three of a kind"]:
+                second_score = score
+            break
+
+    return "", first_score + second_score
 
 def simulate_options(player_hand, full_deck, dealer_card=None, trials=500):
     keep_score = evaluate_hand(player_hand)[1]
