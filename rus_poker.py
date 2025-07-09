@@ -90,48 +90,50 @@ def evaluate_two_combinations(hand6):
     five_card_combos = list(combinations(hand6, 5))
     scored = [evaluate_hand(list(combo))[1] for combo in five_card_combos]
     scored.sort(reverse=True)
-    return "", sum(scored[:2])  # en fazla 2 kombinasyon ödemesi
+    return "", sum(scored[:2])
 
 def simulate_options(player_hand, full_deck, dealer_card=None, trials=500):
     keep_score = evaluate_hand(player_hand)[1]
+    keep_ev = keep_score  # ante ve bet push, ödeme alınırsa bet kadar kazanılır
 
     # 6. kart alma (buy)
-    buy_scores = []
+    buy_gains = []
     for _ in range(trials):
         available_cards = [c for c in full_deck.cards if c not in player_hand and c != dealer_card]
         sixth_card = random.choice(available_cards)
         hand6 = player_hand + [sixth_card]
         _, total_score = evaluate_two_combinations(hand6)
-        buy_scores.append(total_score)
-    avg_buy_score = sum(buy_scores) / trials
+        gain = total_score - 1  # ante kadar ödeme yapılır
+        buy_gains.append(gain)
+    avg_buy_ev = sum(buy_gains) / trials
 
     # Kart değiştirme
-    best_change_score = keep_score
-    best_change_combo = []
+    best_draw_ev = keep_ev
+    best_combo = []
     combinations_to_try = [combo for r in range(1, 6) for combo in itertools.combinations(range(5), r)]
     for combo in combinations_to_try:
-        change_scores = []
+        draw_gains = []
         for _ in range(trials // 10):
             available_cards = [c for c in full_deck.cards if c not in player_hand and c != dealer_card]
             new_hand = player_hand[:]
             for idx in combo:
                 new_hand[idx] = random.choice(available_cards)
-            score = evaluate_hand(new_hand)[1]
-            change_scores.append(score)
-        avg_score = sum(change_scores) / len(change_scores)
-        if avg_score > best_change_score:
-            best_change_score = avg_score
-            best_change_combo = combo
+            new_score = evaluate_hand(new_hand)[1]
+            gain = new_score - 1  # ante kadar ödeme yapılır
+            draw_gains.append(gain)
+        avg_ev = sum(draw_gains) / len(draw_gains)
+        if avg_ev > best_draw_ev:
+            best_draw_ev = avg_ev
+            best_combo = combo
 
-    # Karşılaştırma ve açıklama
-    explanation = f"\n- Mevcut elin ödeme puanı: {keep_score:.2f}" \
-                  f"\n- 6. kart alma sonrası ortalama ödeme puanı: {avg_buy_score:.2f}" \
-                  f"\n- Kart değiştirmenin en iyi ortalama ödeme puanı: {best_change_score:.2f}"
+    explanation = f"\n- Mevcut elin kazanç beklentisi (EV): {keep_ev:.2f}" \
+                  f"\n- 6. kart alırsan ortalama EV: {avg_buy_ev:.2f}" \
+                  f"\n- En iyi kart değişim ortalama EV: {best_draw_ev:.2f}"
 
-    if avg_buy_score >= best_change_score and avg_buy_score > keep_score:
+    if avg_buy_ev >= best_draw_ev and avg_buy_ev > keep_ev:
         return "6. Kart Al (Buy)", explanation
-    elif best_change_score > keep_score:
-        indices = [i+1 for i in best_change_combo]
+    elif best_draw_ev > keep_ev:
+        indices = [i+1 for i in best_combo]
         return f"{len(indices)} Kart Değiştir ({', '.join(map(str, indices))})", explanation
     else:
         return "Kart Çekmeden Oyna", explanation
