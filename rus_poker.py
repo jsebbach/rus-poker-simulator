@@ -57,7 +57,6 @@ def card_image(code):
     return Image.open(path)
 
 def play_hand(player_hand, dealer_hand, deck, buy=False, insurance=False):
-    # Placeholder; gerçek mantık sizin oyunun kurallarına göre tanımlanmalı
     return {
         "dealer_opens": True,
         "dealer_buy": buy,
@@ -73,35 +72,23 @@ def play_hand(player_hand, dealer_hand, deck, buy=False, insurance=False):
 
 def simulate_ev(player_hand, dealer_upcard, base_deck, simulations=500, six_card=False):
     total_gain = 0
-
     for _ in range(simulations):
         deck = Deck()
         deck.cards = base_deck.cards.copy()
-
-        # Kasa eli
         dealer_hand = [dealer_upcard] + deck.draw(4)
-
         if six_card:
             player_sixth = deck.draw(1)[0]
             full_hand = player_hand + [player_sixth]
             all_combos = list(itertools.combinations(full_hand, 5))
-            best_result = max(
-                (play_hand(list(combo), dealer_hand.copy(), deck, buy=False, insurance=False)["net_gain"]
-                 for combo in all_combos),
-                default=0
-            )
+            best_result = max((play_hand(list(combo), dealer_hand.copy(), deck)["net_gain"] for combo in all_combos), default=0)
             total_gain += best_result
         else:
-            result = play_hand(player_hand, dealer_hand.copy(), deck, buy=False, insurance=False)
+            result = play_hand(player_hand, dealer_hand.copy(), deck)
             total_gain += result["net_gain"]
-
     return total_gain / simulations
-
-# STREAMLIT APP
 
 def streamlit_app():
     st.title("Rus Poker Simülatörü")
-
     suits = ['S', 'H', 'D', 'C']
     ranks = list('23456789TJQKA')
     all_cards = [r + s for r in ranks for s in suits]
@@ -111,6 +98,7 @@ def streamlit_app():
     for i in range(5):
         card = st.selectbox(f"Oyuncu Kartı {i+1}", all_cards, key=f"p{i}")
         player_cards_input.append(Card(card[0], card[1]))
+    st.image([card_image(c.short()) for c in player_cards_input], width=100)
 
     st.subheader("Kasa Açık Kartı")
     dealer_upcard = st.selectbox("Kasanın Açık Kartı", all_cards, key="dealer")
@@ -136,7 +124,6 @@ def streamlit_app():
             st.write("Simülasyon yapılıyor, lütfen bekleyin...")
             ev_normal = simulate_ev(player_cards_input, dealer_hand[0], deck, six_card=False)
             ev_six = simulate_ev(player_cards_input, dealer_hand[0], deck, six_card=True)
-
             st.write(f"5 kartla beklenen kazanç: {ev_normal:.2f}")
             st.write(f"6 kartla beklenen kazanç: {ev_six:.2f}")
             if ev_six > ev_normal:
