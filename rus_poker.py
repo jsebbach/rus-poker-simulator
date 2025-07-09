@@ -1,12 +1,9 @@
 import streamlit as st
 import random
-from PIL import Image
-import os
 from collections import Counter
 import itertools
 
-CARD_IMAGES = "cards"
-
+# Kart sınıfı
 class Card:
     def __init__(self, rank, suit):
         self.rank = rank
@@ -29,6 +26,7 @@ class Card:
     def __hash__(self):
         return hash((self.rank, self.suit))
 
+# Deste
 class Deck:
     def __init__(self):
         ranks = '23456789TJQKA'
@@ -42,6 +40,7 @@ class Deck:
     def draw(self, count):
         return [self.cards.pop() for _ in range(count)]
 
+# El değerlendirme
 def evaluate_hand(hand):
     values = sorted([card.value() for card in hand], reverse=True)
     suits = [card.suit for card in hand]
@@ -180,3 +179,67 @@ def play_hand(player_hand, dealer_hand, deck, buy=False, insurance=False):
         "dealer_hand": dealer_hand
     }
 
+def streamlit_app():
+    st.title("Rus Pokeri Simülatörü")
+    deck = Deck()
+
+    st.header("Oyuncunun Kartları")
+    ranks = '23456789TJQKA'
+    suits = 'SHDC'
+    selected_cards = []
+    cols = st.columns(5)
+    for i in range(5):
+        rank = cols[i].selectbox(f"Kart {i+1} Rütbe", ranks, key=f"rank{i}")
+        suit = cols[i].selectbox(f"Kart {i+1} Maça", suits, key=f"suit{i}")
+        selected_cards.append(Card(rank, suit))
+
+    st.header("Kasanın Açık Kartı")
+    dealer_rank = st.selectbox("Kasa Kartı Rütbe", ranks, key="dealer_rank")
+    dealer_suit = st.selectbox("Kasa Kartı Maça", suits, key="dealer_suit")
+    dealer_card = Card(dealer_rank, dealer_suit)
+
+    st.header("Hamle Seçimi")
+    move_option = st.radio("Hamle Seçin:", ["Direkt Oyna", "6. Kart Al (Buy)", "Kart(lar) Değiştir"])
+
+    change_indices = []
+    if move_option == "Kart(lar) Değiştir":
+        st.subheader("Değiştirilecek Kartları Seç")
+        change_cols = st.columns(5)
+        for i in range(5):
+            if change_cols[i].checkbox(f"Kart {i+1}", key=f"change{i}"):
+                change_indices.append(i)
+
+    if st.button("Eli Oyna"):
+        # Deste güncelleme
+        deck.cards = [c for c in deck.cards if c not in selected_cards and c != dealer_card]
+
+        # Kart değiştirme
+        player_hand = selected_cards.copy()
+        if move_option == "Kart(lar) Değiştir":
+            for idx in change_indices:
+                player_hand[idx] = deck.draw(1)[0]
+        elif move_option == "6. Kart Al (Buy)":
+            player_hand.append(deck.draw(1)[0])
+
+        # Kasa kalan kartları çeker
+        dealer_hand = [dealer_card] + deck.draw(4)
+
+        # Öneri
+        suggestion = simulate_options(player_hand[:5], dealer_hand, deck)
+
+        # Sonuç
+        result = play_hand(player_hand[:5], dealer_hand, deck, buy=(move_option == "6. Kart Al (Buy)"))
+
+        st.subheader("Sonuçlar")
+        st.write(f"Kasa açtı mı? {'Evet' if result['dealer_opens'] else 'Hayır'}")
+        st.write(f"Oyuncu Eli: {result['player_combo']}")
+        st.write(f"Kasa Eli: {result['dealer_combo']}")
+        st.write(f"Kazanan: {result['winner']}")
+        st.write(f"A–K Bonus: {'Evet' if result['ak_bonus'] else 'Hayır'}")
+        st.write(f"Toplam Kazanç: {result['net_gain']} ante")
+
+        st.subheader("Program Önerisi")
+        st.write(f"👉 **{suggestion}**")
+
+if __name__ == "__main__":
+    streamlit_app()
