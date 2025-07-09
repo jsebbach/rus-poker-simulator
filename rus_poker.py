@@ -158,4 +158,26 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
         "net_gain": net
     }
 
-# Streamlit UI aynı kalıyor
+def streamlit_app():
+    st.title("Rus Pokeri Simülatörü")
+    st.write("Bu uygulamada oyuncu ve kasa elleri üzerinden sonuç hesaplanır.")
+
+    deck = Deck()
+
+    st.subheader("Oyuncu Kartları")
+    player_cards = deck.draw(5)
+    for card in player_cards:
+        st.image(card_image(card.short()), width=100)
+
+    st.subheader("Kasa Kartları")
+    dealer_cards = deck.draw(5)
+    for card in dealer_cards:
+        st.image(card_image(card.short()), width=100)
+
+    result = play_hand(player_cards, dealer_cards, deck)
+
+    st.subheader("Sonuç")
+    st.write(result)
+
+if __name__ == "__main__":
+    streamlit_app()
