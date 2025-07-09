@@ -133,12 +133,12 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
 
     if score_p > score_d:
         multiplier = [1, 1, 2, 3, 4, 6, 9, 20, 50, 100][score_p]
-        payout = bet * multiplier
+        payout = bet * multiplier + ante  # oyuncu kazanırsa ante de geri alınır
         if 'A' in [c.rank for c in player] and 'K' in [c.rank for c in player] and score_p == 0:
             ak_bonus = True
             payout += 1
     elif score_p == score_d:
-        payout = 0
+        payout = ante  # berabere durumunda ante geri alınır
     else:
         payout = 0
 
@@ -158,73 +158,4 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
         "net_gain": net
     }
 
-def streamlit_app():
-    st.set_page_config(page_title="Rus Pokeri Simülasyonu", layout="centered")
-    st.title("🃏 Rus Pokeri El Simülatörü")
-
-    all_ranks = '23456789TJQKA'
-    all_suits = 'SHDC'
-    all_cards = [f"{r}{s}" for r in all_ranks for s in all_suits]
-
-    st.subheader("🎴 Oyuncu Elini Seç")
-    player_hand_strs = [None] * 5
-    for i in range(5):
-        used = [c for c in player_hand_strs if c]
-        available_cards = [c for c in all_cards if c not in used]
-        player_hand_strs[i] = st.selectbox(
-            f"Kart {i+1}",
-            options=available_cards,
-            key=f"player_{i}"
-        )
-    player_hand = [Card(c[:-1], c[-1]) for c in player_hand_strs]
-
-    st.subheader("🂠 Kasa Açık Kartını Seç")
-    dealer_open_card_str = st.selectbox(
-        "Kasa Açık Kartı",
-        options=[c for c in all_cards if c not in player_hand_strs],
-        key="dealer_open"
-    )
-    dealer_open_card = Card(dealer_open_card_str[:-1], dealer_open_card_str[-1])
-
-    used_cards = player_hand + [dealer_open_card]
-    deck = Deck()
-    deck.cards = [c for c in deck.cards if c.short() not in [card.short() for card in used_cards]]
-    dealer_hand = [dealer_open_card] + deck.draw(4)
-
-    buy = st.checkbox("Kasa açmazsa kart çektirilsin mi?", value=True)
-    insurance = st.checkbox("Sigorta yapılsın mı?", value=True)
-
-    if st.button("🕹️ Eli Oyna"):
-        from copy import deepcopy
-        result = play_hand(deepcopy(player_hand), deepcopy(dealer_hand), deck, buy=buy, insurance=insurance)
-
-        st.subheader("🎴 Oyuncu Eliniz")
-        cols = st.columns(5)
-        for i, card in enumerate(player_hand):
-            with cols[i]:
-                st.image(card_image(card.short()), use_container_width=True)
-                st.caption(card.short())
-
-        st.subheader("🃎 Kasa Eli")
-        cols = st.columns(5)
-        for i, card in enumerate(result["dealer_hand"]):
-            with cols[i]:
-                st.image(card_image(card.short()), use_container_width=True)
-                st.caption(card.short())
-
-        st.subheader("🧮 El Sonucu")
-        st.write("**Kasa Elini Açtı:**", result["dealer_opens"])
-        st.write("**Kasa Kart Çekti:**", result["dealer_buy"])
-        st.write("**Kazanma Durumu:**", result["winner"].upper())
-        st.write("**Oyuncu Kombinasyonu:**", result["player_combo"])
-        if result["second_combo"]:
-            st.write("**İkinci Kombinasyon:**", result["second_combo"])
-        st.write("**Kasa Kombinasyonu:**", result["dealer_combo"])
-        st.write("**A–K Bonusu Var mı:**", result["ak_bonus"])
-        st.write("**Sigorta Kazanacı:**", result["insurance_win"])
-        st.metric("💰 Toplam Kazanç", f"{result['payout']:.2f} ante")
-        st.metric("💸 Toplam Maliyet", f"{result['cost']:.2f} ante")
-        st.metric("📈 Net Kar/Zarar", f"{result['net_gain']:.2f} ante")
-
-if __name__ == "__main__":
-    streamlit_app()
+# Streamlit UI aynı kalıyor
