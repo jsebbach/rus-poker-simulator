@@ -29,8 +29,8 @@ class Card:
 # Deste
 class Deck:
     def __init__(self):
-        ranks = '23456789TJQKA'
-        suits = 'SHDC'
+        ranks = list('23456789TJQKA')
+        suits = list('SHDC')
         self.cards = [Card(r, s) for r in ranks for s in suits]
         self.shuffle()
 
@@ -185,8 +185,8 @@ def streamlit_app():
     deck = Deck()
 
     st.header("Oyuncunun Kartları")
-    ranks = '23456789TJQKA'
-    suits = 'SHDC'
+    ranks = list('23456789TJQKA')
+    suits = list('SHDC')
     selected_cards = []
     cols = st.columns(5)
     for i in range(5):
