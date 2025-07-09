@@ -88,15 +88,15 @@ def evaluate_hand(hand):
 def evaluate_two_combinations(hand6):
     from itertools import combinations
     five_card_combos = list(combinations(hand6, 5))
-    scores = []
-    for combo in five_card_combos:
-        combo_list = list(combo)
-        name, score = evaluate_hand(combo_list)
-        # Yalnızca Three of a Kind ve üzerini al
-        if score >= PAYOUT_MULTIPLIERS["three of a kind"]:
-            scores.append(score)
-    scores.sort(reverse=True)
-    return "", sum(scores[:2])
+    combo_scores = [(evaluate_hand(list(combo))[1]) for combo in five_card_combos]
+    combo_scores.sort(reverse=True)
+    if len(combo_scores) >= 2:
+        top = combo_scores[0]
+        second = combo_scores[1] if combo_scores[1] >= PAYOUT_MULTIPLIERS["three of a kind"] else 0
+        return "", top + second
+    elif len(combo_scores) == 1:
+        return "", combo_scores[0]
+    return "", 0
 
 def simulate_options(player_hand, full_deck, dealer_card=None, trials=500):
     keep_score = evaluate_hand(player_hand)[1]
@@ -125,10 +125,7 @@ def simulate_options(player_hand, full_deck, dealer_card=None, trials=500):
             for idx in combo:
                 new_hand[idx] = random.choice(available_cards)
             new_score = evaluate_hand(new_hand)[1]
-            if new_score >= PAYOUT_MULTIPLIERS["three of a kind"]:
-                gain = new_score - 1  # ante kadar ödeme yapılır
-            else:
-                gain = 0 - 1
+            gain = new_score - 1  # ante kadar ödeme yapılır
             draw_gains.append(gain)
         avg_ev = sum(draw_gains) / len(draw_gains)
         if avg_ev > best_draw_ev:
