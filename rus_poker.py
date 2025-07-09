@@ -71,33 +71,57 @@ def evaluate_hand(hand):
         return "pair", 2
     return "high card", 1
 
-def simulate_options(player_hand, deck):
-    keep_hand = player_hand.copy()
-    buy_card = player_hand.copy() + deck.draw(1)
-    combinations = list(itertools.combinations(range(5), r=1)) + list(itertools.combinations(range(5), r=2)) + list(itertools.combinations(range(5), r=3)) + list(itertools.combinations(range(5), r=4)) + [tuple(range(5))]
+def evaluate_two_combinations(hand6):
+    from itertools import combinations
+    scores = []
+    best_labels = []
+    five_card_combos = list(combinations(hand6, 5))
+    for combo in five_card_combos:
+        label, score = evaluate_hand(list(combo))
+        scores.append(score)
+        best_labels.append(label)
+    total_score = sum(scores)
+    return max(best_labels), total_score
 
-    best_change = keep_hand
-    best_score = evaluate_hand(keep_hand)[1]
-    for combo in combinations:
-        new_hand = player_hand.copy()
+def simulate_options(player_hand, deck, trials=500):
+    keep_score = evaluate_hand(player_hand)[1]
+
+    # 6. kart alma (buy)
+    buy_scores = []
+    for _ in range(trials):
         new_deck = Deck()
         new_deck.cards = [c for c in new_deck.cards if c not in player_hand]
-        for idx in combo:
-            new_hand[idx] = new_deck.draw(1)[0]
-        score = evaluate_hand(new_hand)[1]
-        if score > best_score:
-            best_score = score
-            best_change = new_hand
+        sixth_card = random.choice(new_deck.cards)
+        hand6 = player_hand + [sixth_card]
+        _, total_score = evaluate_two_combinations(hand6)
+        buy_scores.append(total_score)
+    avg_buy_score = sum(buy_scores) / trials
 
-    buy_score = evaluate_hand(buy_card[:5])[1]
-    change_score = evaluate_hand(best_change)[1]
-    base_score = evaluate_hand(keep_hand)[1]
+    # Kart değiştirme
+    best_change_score = keep_score
+    best_change_combo = []
+    combinations_to_try = [combo for r in range(1, 6) for combo in itertools.combinations(range(5), r)]
+    for combo in combinations_to_try:
+        change_scores = []
+        for _ in range(trials // 10):
+            new_deck = Deck()
+            new_deck.cards = [c for c in new_deck.cards if c not in player_hand]
+            new_hand = player_hand[:]
+            for idx in combo:
+                new_hand[idx] = random.choice(new_deck.cards)
+            score = evaluate_hand(new_hand)[1]
+            change_scores.append(score)
+        avg_score = sum(change_scores) / len(change_scores)
+        if avg_score > best_change_score:
+            best_change_score = avg_score
+            best_change_combo = combo
 
-    if buy_score >= change_score and buy_score > base_score:
+    # Karşılaştırma
+    if avg_buy_score >= best_change_score and avg_buy_score > keep_score:
         return "6. Kart Al (Buy)"
-    elif change_score > base_score:
-        changed = [i+1 for i in range(5) if player_hand[i] != best_change[i]]
-        return f"{len(changed)} Kart Değiştir ({', '.join(map(str, changed))})"
+    elif best_change_score > keep_score:
+        indices = [i+1 for i in best_change_combo]
+        return f"{len(indices)} Kart Değiştir ({', '.join(map(str, indices))})"
     else:
         return "Kart Çekmeden Oyna"
 
