@@ -177,7 +177,8 @@ def play_hand(player_hand, dealer_hand, deck, buy=False, insurance=False):
         "payout": payout,
         "cost": total_cost,
         "net_gain": net_gain,
-        "dealer_hand": dealer_hand
+        "dealer_hand": dealer_hand,
+        "player_hand": player_hand
     }
 
 def streamlit_app():
@@ -228,8 +229,10 @@ def streamlit_app():
 
         st.subheader("Sonuçlar")
         st.write(f"Kasa açtı mı? {'Evet' if result['dealer_opens'] else 'Hayır'}")
-        st.write(f"Oyuncu Eli: {result['player_combo']}")
-        st.write(f"Kasa Eli: {result['dealer_combo']}")
+        st.write(f"Oyuncu Eli: {result['player_hand']}")
+        st.write(f"Oyuncu Kombinasyonu: {result['player_combo']}")
+        st.write(f"Kasa Eli: {result['dealer_hand']}")
+        st.write(f"Kasa Kombinasyonu: {result['dealer_combo']}")
         st.write(f"Kazanan: {result['winner']}")
         st.write(f"A–K Bonus: {'Evet' if result['ak_bonus'] else 'Hayır'}")
         st.write(f"Toplam Kazanç: {result['net_gain']} ante")
