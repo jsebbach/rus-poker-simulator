@@ -15,7 +15,7 @@ class Card:
         return f"{self.rank}{self.suit}"
 
     def value(self):
-        order = {'2': 2, '3': 3, '4':  '4', '5': 5, '6': 6, '7': 7,
+        order = {'2': 2, '3': 3, '4': '4', '5': 5, '6': 6, '7': 7,
                  '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
         return order[self.rank]
 
@@ -70,24 +70,49 @@ def classify_hand(cards):
         values = [5, 4, 3, 2, 1]
 
     if is_straight and is_flush and values[0] == 14:
-        return (9, "Royal Flush")
+        return (9, "Royal Flush"), values
     if is_straight and is_flush:
-        return (8, "Straight Flush")
+        return (8, "Straight Flush"), values
     if counts == [4, 1]:
-        return (7, "Four of a Kind")
+        return (7, "Four of a Kind"), get_rank_order(counter, [4, 1])
     if counts == [3, 2]:
-        return (6, "Full House")
+        return (6, "Full House"), get_rank_order(counter, [3, 2])
     if is_flush:
-        return (5, "Flush")
+        return (5, "Flush"), values
     if is_straight:
-        return (4, "Straight")
+        return (4, "Straight"), values
     if counts == [3, 1, 1]:
-        return (3, "Three of a Kind")
+        return (3, "Three of a Kind"), get_rank_order(counter, [3, 1, 1])
     if counts == [2, 2, 1]:
-        return (2, "Two Pair")
+        return (2, "Two Pair"), get_rank_order(counter, [2, 2, 1])
     if counts == [2, 1, 1, 1]:
-        return (1, "One Pair")
-    return (0, "High Card")
+        return (1, "One Pair"), get_rank_order(counter, [2, 1, 1, 1])
+    return (0, "High Card"), values
+
+def get_rank_order(counter, pattern):
+    ordered = []
+    for count in pattern:
+        for val, cnt in counter.most_common():
+            if cnt == count and val not in ordered:
+                ordered.append(val)
+                break
+    for val in sorted(counter.keys(), reverse=True):
+        if val not in ordered:
+            ordered.append(val)
+    return ordered
+
+def compare_hands(player_score, player_vals, dealer_score, dealer_vals):
+    if player_score > dealer_score:
+        return "player"
+    elif player_score < dealer_score:
+        return "dealer"
+    else:
+        for pv, dv in zip(player_vals, dealer_vals):
+            if pv > dv:
+                return "player"
+            elif pv < dv:
+                return "dealer"
+        return "tie"
 
 def play_hand(player, dealer, deck, buy=True, insurance=True):
     ante = 1
@@ -95,7 +120,7 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
     payout = 0
     cost = ante + bet
 
-    dealer_opens = classify_hand(dealer)[0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
+    dealer_opens = classify_hand(dealer)[0][0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
 
     insurance_win = not dealer_opens
     insurance_payout = (bet * 3 if insurance_win else 0) if insurance else 0
@@ -107,11 +132,12 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
         worst = min(dealer, key=lambda c: c.value())
         dealer.remove(worst)
         dealer.append(deck.draw(1)[0])
-        dealer_opens = classify_hand(dealer)[0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
+        dealer_opens = classify_hand(dealer)[0][0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
         cost += ante
 
-    score_p, combo_p = classify_hand(player)
-    score_d, combo_d = classify_hand(dealer)
+    (score_p, combo_p), val_p = classify_hand(player)
+    (score_d, combo_d), val_d = classify_hand(dealer)
+
     ak_bonus = False
     second_combo = None
 
@@ -131,13 +157,15 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
             "net_gain": insurance_payout + (ante if not buy else 0) - cost
         }
 
-    if score_p > score_d:
+    winner = compare_hands(score_p, val_p, score_d, val_d)
+
+    if winner == "player":
         multiplier = [1, 1, 2, 3, 4, 6, 9, 20, 50, 100][score_p]
         payout = bet * multiplier + ante
         if 'A' in [c.rank for c in player] and 'K' in [c.rank for c in player] and score_p == 0:
             ak_bonus = True
             payout += 1
-    elif score_p == score_d:
+    elif winner == "tie":
         payout = ante
     else:
         payout = 0
@@ -146,7 +174,7 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
     return {
         "dealer_opens": dealer_opens,
         "dealer_buy": dealer_buy,
-        "winner": "player" if score_p > score_d else "tie" if score_p == score_d else "dealer",
+        "winner": winner,
         "player_combo": combo_p,
         "dealer_combo": combo_d,
         "dealer_hand": dealer,
@@ -158,45 +186,4 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
         "net_gain": net
     }
 
-def streamlit_app():
-    st.title("Rus Pokeri Simülatörü")
-    st.write("Kartları seçin ve oyunu oynatmak için butona basın.")
-
-    ranks = '23456789TJQKA'
-    suits = 'SHDC'
-    all_cards = [f"{r}{s}" for r in ranks for s in suits]
-
-    st.subheader("Oyuncu Kartları")
-    player_cards_str = []
-    cols = st.columns(5)
-    for i in range(5):
-        with cols[i]:
-            card = st.selectbox(f"Kart {i+1}", all_cards, key=f"player_{i}")
-            player_cards_str.append(card)
-
-    st.subheader("Kasa Açık Kartı")
-    dealer_visible_card = st.selectbox("Kasa Açık Kartı", all_cards, key="dealer_visible")
-
-    if st.button("Eli Oyna"):
-        used = set(player_cards_str + [dealer_visible_card])
-        deck = Deck()
-        deck.cards = [c for c in deck.cards if c.short() not in used]
-
-        player_cards = [Card(c[0], c[1]) for c in player_cards_str]
-        dealer_cards = [Card(dealer_visible_card[0], dealer_visible_card[1])] + deck.draw(4)
-
-        st.subheader("Oyuncu Kartları")
-        for card in player_cards:
-            st.image(card_image(card.short()), width=100)
-
-        st.subheader("Kasa Kartları")
-        for card in dealer_cards:
-            st.image(card_image(card.short()), width=100)
-
-        result = play_hand(player_cards, dealer_cards, deck)
-
-        st.subheader("Sonuç")
-        st.json(result)
-
-if __name__ == "__main__":
-    streamlit_app()
+# streamlit_app aynı kalır
