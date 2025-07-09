@@ -116,14 +116,18 @@ def simulate_options(player_hand, deck, trials=500):
             best_change_score = avg_score
             best_change_combo = combo
 
-    # Karşılaştırma
+    # Karşılaştırma ve açıklama
+    explanation = f"\n- Mevcut elin puanı: {keep_score:.2f}" \
+                  f"\n- 6. kart alma sonrası ortalama puan: {avg_buy_score:.2f}" \
+                  f"\n- Kart değiştirmenin en iyi ortalama puanı: {best_change_score:.2f}"
+
     if avg_buy_score >= best_change_score and avg_buy_score > keep_score:
-        return "6. Kart Al (Buy)"
+        return "6. Kart Al (Buy)", explanation
     elif best_change_score > keep_score:
         indices = [i+1 for i in best_change_combo]
-        return f"{len(indices)} Kart Değiştir ({', '.join(map(str, indices))})"
+        return f"{len(indices)} Kart Değiştir ({', '.join(map(str, indices))})", explanation
     else:
-        return "Kart Çekmeden Oyna"
+        return "Kart Çekmeden Oyna", explanation
 
 def streamlit_app():
     st.title("Rus Pokeri: El Öneri Modu")
@@ -146,9 +150,10 @@ def streamlit_app():
 
     if st.button("Hamle Önerisi Al"):
         deck.cards = [c for c in deck.cards if c not in selected_cards and c != dealer_card]
-        suggestion = simulate_options(selected_cards, deck)
+        suggestion, explanation = simulate_options(selected_cards, deck)
         st.subheader("Program Önerisi")
         st.write(f"👉 **{suggestion}**")
+        st.text(explanation)
 
 if __name__ == "__main__":
     streamlit_app()
