@@ -42,110 +42,141 @@ class Deck:
     def draw(self, count):
         return [self.cards.pop() for _ in range(count)]
 
-def card_image(code):
-    rank_map = {
-        '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7',
-        '8': '8', '9': '9', 'T': '10', 'J': 'jack', 'Q': 'queen', 'K': 'king', 'A': 'ace'
+def evaluate_hand(hand):
+    values = sorted([card.value() for card in hand], reverse=True)
+    suits = [card.suit for card in hand]
+    counts = Counter(values)
+    most_common = counts.most_common()
+
+    is_flush = len(set(suits)) == 1
+    is_straight = all(values[i] - 1 == values[i+1] for i in range(len(values)-1)) or values == [14, 5, 4, 3, 2]
+
+    if is_flush and is_straight and values[0] == 14:
+        return "royal flush", 10
+    if is_flush and is_straight:
+        return "straight flush", 9
+    if most_common[0][1] == 4:
+        return "four of a kind", 8
+    if most_common[0][1] == 3 and most_common[1][1] == 2:
+        return "full house", 7
+    if is_flush:
+        return "flush", 6
+    if is_straight:
+        return "straight", 5
+    if most_common[0][1] == 3:
+        return "three of a kind", 4
+    if most_common[0][1] == 2 and most_common[1][1] == 2:
+        return "two pair", 3
+    if most_common[0][1] == 2:
+        return "pair", 2
+    return "high card", 1
+
+def get_payout(combo):
+    payouts = {
+        "royal flush": 100,
+        "straight flush": 50,
+        "four of a kind": 20,
+        "full house": 7,
+        "flush": 5,
+        "straight": 4,
+        "three of a kind": 3,
+        "two pair": 2,
+        "pair": 1,
+        "high card": 0
     }
-    suit_map = {
-        'H': 'hearts', 'D': 'diamonds', 'S': 'spades', 'C': 'clubs'
-    }
-    rank = rank_map[code[0]]
-    suit = suit_map[code[1]]
-    filename = f"{rank}_of_{suit}.png"
-    path = os.path.join(CARD_IMAGES, filename)
-    return Image.open(path)
+    return payouts.get(combo, 0)
+
+def is_ak_bonus(hand):
+    has_a = any(card.rank == 'A' for card in hand)
+    has_k = any(card.rank == 'K' for card in hand)
+    combo, _ = evaluate_hand(hand)
+    return has_a and has_k and combo == "high card"
+
+def dealer_should_open(dealer_hand):
+    has_a = any(card.rank == 'A' for card in dealer_hand)
+    has_k = any(card.rank == 'K' for card in dealer_hand)
+    combo, _ = evaluate_hand(dealer_hand)
+    return combo != "high card" or (has_a and has_k)
+
+def simulate_options(player_hand, dealer_hand, deck):
+    keep_hand = player_hand.copy()
+    buy_card = player_hand.copy() + deck.draw(1)
+    combinations = list(itertools.combinations(range(5), r=1)) + list(itertools.combinations(range(5), r=2))
+
+    best_change = keep_hand
+    best_score = evaluate_hand(keep_hand)[1]
+    for combo in combinations:
+        new_hand = player_hand.copy()
+        for idx in combo:
+            new_hand[idx] = deck.draw(1)[0]
+        score = evaluate_hand(new_hand)[1]
+        if score > best_score:
+            best_score = score
+            best_change = new_hand
+
+    buy_score = evaluate_hand(buy_card[:5])[1]
+    change_score = evaluate_hand(best_change)[1]
+    base_score = evaluate_hand(keep_hand)[1]
+
+    if buy_score >= change_score and buy_score > base_score:
+        return "Buy 6th card"
+    elif change_score > base_score:
+        return "Change cards"
+    else:
+        return "Play as is"
 
 def play_hand(player_hand, dealer_hand, deck, buy=False, insurance=False):
+    player_combo, player_strength = evaluate_hand(player_hand)
+    dealer_combo, dealer_strength = evaluate_hand(dealer_hand)
+
+    dealer_opens = dealer_should_open(dealer_hand)
+    player_wins = False
+    tie = False
+    payout = 0
+    ak_bonus = False
+    insurance_payout = 0
+    base_cost = 2
+    total_cost = base_cost + (1 if buy else 0) + (get_payout(player_combo) if insurance else 0)
+
+    if not dealer_opens:
+        if buy:
+            weakest = min(dealer_hand, key=lambda c: c.value())
+            dealer_hand.remove(weakest)
+            dealer_hand.append(deck.draw(1)[0])
+            dealer_combo, dealer_strength = evaluate_hand(dealer_hand)
+            dealer_opens = dealer_should_open(dealer_hand)
+
+    if dealer_opens:
+        if player_strength > dealer_strength:
+            player_wins = True
+        elif player_strength == dealer_strength:
+            tie = True
+
+    if not dealer_opens:
+        if insurance:
+            insurance_payout = get_payout(player_combo)
+        if not buy:
+            payout = 1
+    elif player_wins:
+        payout = get_payout(player_combo)
+        if is_ak_bonus(player_hand):
+            ak_bonus = True
+            payout += 1
+    elif tie:
+        payout = 0
+
+    net_gain = payout - total_cost + insurance_payout
+
     return {
-        "dealer_opens": True,
+        "dealer_opens": dealer_opens,
         "dealer_buy": buy,
-        "player_combo": "pair",
-        "dealer_combo": "high card",
-        "winner": "player",
-        "ak_bonus": False,
-        "payout": 3,
-        "cost": 3,
-        "net_gain": 0,
+        "player_combo": player_combo,
+        "dealer_combo": dealer_combo,
+        "winner": "player" if player_wins else "tie" if tie else "dealer",
+        "ak_bonus": ak_bonus,
+        "payout": payout,
+        "cost": total_cost,
+        "net_gain": net_gain,
         "dealer_hand": dealer_hand
     }
 
-def simulate_ev(player_hand, dealer_upcard, base_deck, simulations=500, six_card=False):
-    total_gain = 0
-    for _ in range(simulations):
-        deck = Deck()
-        deck.cards = base_deck.cards.copy()
-        dealer_hand = [dealer_upcard] + deck.draw(4)
-        if six_card:
-            player_sixth = deck.draw(1)[0]
-            full_hand = player_hand + [player_sixth]
-            all_combos = list(itertools.combinations(full_hand, 5))
-            best_result = max((play_hand(list(combo), dealer_hand.copy(), deck)["net_gain"] for combo in all_combos), default=0)
-            total_gain += best_result
-        else:
-            result = play_hand(player_hand, dealer_hand.copy(), deck)
-            total_gain += result["net_gain"]
-    return total_gain / simulations
-
-def streamlit_app():
-    st.title("Rus Poker Simülatörü")
-    suits = ['S', 'H', 'D', 'C']
-    ranks = list('23456789TJQKA')
-    all_cards = [r + s for r in ranks for s in suits]
-
-    st.subheader("Oyuncu Kartları")
-    player_cards_input = []
-    for i in range(5):
-        card = st.selectbox(f"Oyuncu Kartı {i+1}", all_cards, key=f"p{i}")
-        player_cards_input.append(Card(card[0], card[1]))
-    st.image([card_image(c.short()) for c in player_cards_input], width=100)
-
-    st.subheader("Kasa Açık Kartı")
-    dealer_upcard = st.selectbox("Kasanın Açık Kartı", all_cards, key="dealer")
-    dealer_hand = [Card(dealer_upcard[0], dealer_upcard[1])]
-
-    st.subheader("Oyun Seçenekleri")
-    buy = st.checkbox("Kasa kart çeksin mi (Buy)?", value=True)
-    insurance = st.checkbox("Sigorta yapıldı mı?", value=True)
-
-    st.subheader("Oyuncu Aksiyonu")
-    action = st.radio("Oyuncu ne yapsın?", ["Hiçbir şey yapma", "6. kartı al", "Kart değiştir"])
-
-    if st.button("🟩 Eli Oyna"):
-        deck = Deck()
-        used_cards = player_cards_input + dealer_hand
-        for c in used_cards:
-            if c in deck.cards:
-                deck.cards.remove(c)
-
-        dealer_hand += deck.draw(4)
-
-        if action == "6. kartı al":
-            st.write("Simülasyon yapılıyor, lütfen bekleyin...")
-            ev_normal = simulate_ev(player_cards_input, dealer_hand[0], deck, six_card=False)
-            ev_six = simulate_ev(player_cards_input, dealer_hand[0], deck, six_card=True)
-            st.write(f"5 kartla beklenen kazanç: {ev_normal:.2f}")
-            st.write(f"6 kartla beklenen kazanç: {ev_six:.2f}")
-            if ev_six > ev_normal:
-                st.success("✅ 6. kart alınmalı (beklenen kazanç daha yüksek)")
-            else:
-                st.warning("🚫 6. kart alınmamalı (beklenen kazanç düşük)")
-
-        result = play_hand(player_cards_input, dealer_hand, deck, buy=buy, insurance=insurance)
-
-        st.subheader("Sonuçlar")
-        st.write(f"Kasa açtı mı: {'Evet' if result['dealer_opens'] else 'Hayır'}")
-        st.write(f"Kasa kart aldı mı: {'Evet' if result['dealer_buy'] else 'Hayır'}")
-        st.write(f"Oyuncu Kombosu: {result['player_combo']}")
-        if result['dealer_opens']:
-            st.write(f"Kasa Kombosu: {result['dealer_combo']}")
-        st.write(f"Kazanan: {result['winner']}")
-        if result['ak_bonus']:
-            st.write("💥 A-K Bonusu Alındı")
-        st.write(f"Kazanç: {result['payout']} (Maliyet: {result['cost']}, Net: {result['net_gain']})")
-        st.write("---")
-        st.write("Kasa Eli:")
-        st.image([card_image(c.short()) for c in result['dealer_hand']], width=100)
-
-if __name__ == "__main__":
-    streamlit_app()
