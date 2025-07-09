@@ -3,6 +3,20 @@ import random
 from collections import Counter
 import itertools
 
+# Ödeme çarpanları
+PAYOUT_MULTIPLIERS = {
+    "royal flush": 100,
+    "straight flush": 50,
+    "four of a kind": 20,
+    "full house": 14,
+    "flush": 7,
+    "straight": 4,
+    "three of a kind": 3,
+    "two pair": 2,
+    "pair": 1,
+    "high card": 0
+}
+
 # Kart sınıfı
 class Card:
     def __init__(self, rank, suit):
@@ -52,24 +66,24 @@ def evaluate_hand(hand):
     is_straight = all(values[i] - 1 == values[i+1] for i in range(len(values)-1)) or values == [14, 5, 4, 3, 2]
 
     if is_flush and is_straight and values[0] == 14:
-        return "royal flush", 10
+        return "royal flush", PAYOUT_MULTIPLIERS["royal flush"]
     if is_flush and is_straight:
-        return "straight flush", 9
+        return "straight flush", PAYOUT_MULTIPLIERS["straight flush"]
     if most_common[0][1] == 4:
-        return "four of a kind", 8
+        return "four of a kind", PAYOUT_MULTIPLIERS["four of a kind"]
     if most_common[0][1] == 3 and most_common[1][1] == 2:
-        return "full house", 7
+        return "full house", PAYOUT_MULTIPLIERS["full house"]
     if is_flush:
-        return "flush", 6
+        return "flush", PAYOUT_MULTIPLIERS["flush"]
     if is_straight:
-        return "straight", 5
+        return "straight", PAYOUT_MULTIPLIERS["straight"]
     if most_common[0][1] == 3:
-        return "three of a kind", 4
+        return "three of a kind", PAYOUT_MULTIPLIERS["three of a kind"]
     if most_common[0][1] == 2 and most_common[1][1] == 2:
-        return "two pair", 3
+        return "two pair", PAYOUT_MULTIPLIERS["two pair"]
     if most_common[0][1] == 2:
-        return "pair", 2
-    return "high card", 1
+        return "pair", PAYOUT_MULTIPLIERS["pair"]
+    return "high card", PAYOUT_MULTIPLIERS["high card"]
 
 def evaluate_two_combinations(hand6):
     from itertools import combinations
@@ -117,9 +131,9 @@ def simulate_options(player_hand, deck, trials=500):
             best_change_combo = combo
 
     # Karşılaştırma ve açıklama
-    explanation = f"\n- Mevcut elin puanı: {keep_score:.2f}" \
-                  f"\n- 6. kart alma sonrası ortalama puan: {avg_buy_score:.2f}" \
-                  f"\n- Kart değiştirmenin en iyi ortalama puanı: {best_change_score:.2f}"
+    explanation = f"\n- Mevcut elin ödeme puanı: {keep_score:.2f}" \
+                  f"\n- 6. kart alma sonrası ortalama ödeme puanı: {avg_buy_score:.2f}" \
+                  f"\n- Kart değiştirmenin en iyi ortalama ödeme puanı: {best_change_score:.2f}"
 
     if avg_buy_score >= best_change_score and avg_buy_score > keep_score:
         return "6. Kart Al (Buy)", explanation
