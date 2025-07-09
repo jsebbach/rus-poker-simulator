@@ -41,6 +41,7 @@ class Deck:
         return [self.cards.pop() for _ in range(count)]
 
 # El değerlendirme
+
 def evaluate_hand(hand):
     values = sorted([card.value() for card in hand], reverse=True)
     suits = [card.suit for card in hand]
@@ -189,13 +190,13 @@ def streamlit_app():
     selected_cards = []
     cols = st.columns(5)
     for i in range(5):
-        rank = cols[i].selectbox(f"Kart {i+1} Rütbe", ranks, key=f"rank{i}")
-        suit = cols[i].selectbox(f"Kart {i+1} Maça", suits, key=f"suit{i}")
+        rank = cols[i].selectbox(f"Kart {i+1} Rütbe", ranks, key=f"player_rank_{i}")
+        suit = cols[i].selectbox(f"Kart {i+1} Maça", suits, key=f"player_suit_{i}")
         selected_cards.append(Card(rank, suit))
 
     st.header("Kasanın Açık Kartı")
-    dealer_rank = st.selectbox("Kasa Kartı Rütbe", ranks, key="dealer_rank")
-    dealer_suit = st.selectbox("Kasa Kartı Maça", suits, key="dealer_suit")
+    dealer_rank = st.selectbox("Kasa Kartı Rütbe", ranks, key="dealer_rank_unique")
+    dealer_suit = st.selectbox("Kasa Kartı Maça", suits, key="dealer_suit_unique")
     dealer_card = Card(dealer_rank, dealer_suit)
 
     st.header("Hamle Seçimi")
@@ -210,10 +211,8 @@ def streamlit_app():
                 change_indices.append(i)
 
     if st.button("Eli Oyna"):
-        # Deste güncelleme
         deck.cards = [c for c in deck.cards if c not in selected_cards and c != dealer_card]
 
-        # Kart değiştirme
         player_hand = selected_cards.copy()
         if move_option == "Kart(lar) Değiştir":
             for idx in change_indices:
@@ -221,13 +220,10 @@ def streamlit_app():
         elif move_option == "6. Kart Al (Buy)":
             player_hand.append(deck.draw(1)[0])
 
-        # Kasa kalan kartları çeker
         dealer_hand = [dealer_card] + deck.draw(4)
 
-        # Öneri
         suggestion = simulate_options(player_hand[:5], dealer_hand, deck)
 
-        # Sonuç
         result = play_hand(player_hand[:5], dealer_hand, deck, buy=(move_option == "6. Kart Al (Buy)"))
 
         st.subheader("Sonuçlar")
