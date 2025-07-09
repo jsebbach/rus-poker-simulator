@@ -15,7 +15,7 @@ class Card:
         return f"{self.rank}{self.suit}"
 
     def value(self):
-        order = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
+        order = {'2': 2, '3': 3, '4':  '4', '5': 5, '6': 6, '7': 7,
                  '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
         return order[self.rank]
 
@@ -133,12 +133,12 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
 
     if score_p > score_d:
         multiplier = [1, 1, 2, 3, 4, 6, 9, 20, 50, 100][score_p]
-        payout = bet * multiplier + ante  # oyuncu kazanırsa ante de geri alınır
+        payout = bet * multiplier + ante
         if 'A' in [c.rank for c in player] and 'K' in [c.rank for c in player] and score_p == 0:
             ak_bonus = True
             payout += 1
     elif score_p == score_d:
-        payout = ante  # berabere durumunda ante geri alınır
+        payout = ante
     else:
         payout = 0
 
@@ -160,24 +160,43 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
 
 def streamlit_app():
     st.title("Rus Pokeri Simülatörü")
-    st.write("Bu uygulamada oyuncu ve kasa elleri üzerinden sonuç hesaplanır.")
+    st.write("Kartları seçin ve oyunu oynatmak için butona basın.")
 
-    deck = Deck()
+    ranks = '23456789TJQKA'
+    suits = 'SHDC'
+    all_cards = [f"{r}{s}" for r in ranks for s in suits]
 
     st.subheader("Oyuncu Kartları")
-    player_cards = deck.draw(5)
-    for card in player_cards:
-        st.image(card_image(card.short()), width=100)
+    player_cards_str = []
+    cols = st.columns(5)
+    for i in range(5):
+        with cols[i]:
+            card = st.selectbox(f"Kart {i+1}", all_cards, key=f"player_{i}")
+            player_cards_str.append(card)
 
-    st.subheader("Kasa Kartları")
-    dealer_cards = deck.draw(5)
-    for card in dealer_cards:
-        st.image(card_image(card.short()), width=100)
+    st.subheader("Kasa Açık Kartı")
+    dealer_visible_card = st.selectbox("Kasa Açık Kartı", all_cards, key="dealer_visible")
 
-    result = play_hand(player_cards, dealer_cards, deck)
+    if st.button("Eli Oyna"):
+        used = set(player_cards_str + [dealer_visible_card])
+        deck = Deck()
+        deck.cards = [c for c in deck.cards if c.short() not in used]
 
-    st.subheader("Sonuç")
-    st.write(result)
+        player_cards = [Card(c[0], c[1]) for c in player_cards_str]
+        dealer_cards = [Card(dealer_visible_card[0], dealer_visible_card[1])] + deck.draw(4)
+
+        st.subheader("Oyuncu Kartları")
+        for card in player_cards:
+            st.image(card_image(card.short()), width=100)
+
+        st.subheader("Kasa Kartları")
+        for card in dealer_cards:
+            st.image(card_image(card.short()), width=100)
+
+        result = play_hand(player_cards, dealer_cards, deck)
+
+        st.subheader("Sonuç")
+        st.json(result)
 
 if __name__ == "__main__":
     streamlit_app()
