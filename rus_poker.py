@@ -161,12 +161,13 @@ def play_hand(player, dealer, deck, buy=True, insurance=True):
 
     if winner == "player":
         multiplier = [1, 1, 2, 3, 4, 6, 9, 20, 50, 100][score_p]
-        payout = bet * multiplier + ante
+        payout = bet * multiplier
+        payout += ante + bet  # push
         if 'A' in [c.rank for c in player] and 'K' in [c.rank for c in player] and score_p == 0:
             ak_bonus = True
             payout += 1
     elif winner == "tie":
-        payout = ante
+        payout = ante + bet  # push
     else:
         payout = 0
 
