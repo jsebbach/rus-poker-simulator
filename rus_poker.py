@@ -56,8 +56,22 @@ def card_image(code):
     path = os.path.join(CARD_IMAGES, filename)
     return Image.open(path)
 
+def play_hand(player_hand, dealer_hand, deck, buy=False, insurance=False):
+    # Placeholder; gerçek mantık sizin oyunun kurallarına göre tanımlanmalı
+    return {
+        "dealer_opens": True,
+        "dealer_buy": buy,
+        "player_combo": "pair",
+        "dealer_combo": "high card",
+        "winner": "player",
+        "ak_bonus": False,
+        "payout": 3,
+        "cost": 3,
+        "net_gain": 0,
+        "dealer_hand": dealer_hand
+    }
+
 def simulate_ev(player_hand, dealer_upcard, base_deck, simulations=500, six_card=False):
-    from rus_poker import play_hand
     total_gain = 0
 
     for _ in range(simulations):
