@@ -15,7 +15,7 @@ class Card:
         return f"{self.rank}{self.suit}"
 
     def value(self):
-        order = {'2': 2, '3': 3, '4': '4', '5':  5, '6': 6, '7': 7,
+        order = {'2': 2, '3': 3, '4': 4, '5':  5, '6': 6, '7': 7,
                  '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
         return order[self.rank]
 
@@ -55,7 +55,136 @@ def card_image(code):
     path = os.path.join(CARD_IMAGES, filename)
     return Image.open(path)
 
-# ... diğer tüm fonksiyonlar aynı kalır ...
+def classify_hand(cards):
+    values = sorted([c.value() for c in cards], reverse=True)
+    suits = [c.suit for c in cards]
+    counter = Counter(values)
+    counts = sorted(counter.values(), reverse=True)
+    unique_vals = sorted(counter.keys(), reverse=True)
+
+    is_flush = len(set(suits)) == 1
+    is_straight = all(values[i] - 1 == values[i + 1] for i in range(4))
+
+    if values == [14, 5, 4, 3, 2]:
+        is_straight = True
+        values = [5, 4, 3, 2, 1]
+
+    if is_straight and is_flush and values[0] == 14:
+        return (9, "Royal Flush"), values
+    if is_straight and is_flush:
+        return (8, "Straight Flush"), values
+    if counts == [4, 1]:
+        return (7, "Four of a Kind"), get_rank_order(counter, [4, 1])
+    if counts == [3, 2]:
+        return (6, "Full House"), get_rank_order(counter, [3, 2])
+    if is_flush:
+        return (5, "Flush"), values
+    if is_straight:
+        return (4, "Straight"), values
+    if counts == [3, 1, 1]:
+        return (3, "Three of a Kind"), get_rank_order(counter, [3, 1, 1])
+    if counts == [2, 2, 1]:
+        return (2, "Two Pair"), get_rank_order(counter, [2, 2, 1])
+    if counts == [2, 1, 1, 1]:
+        return (1, "One Pair"), get_rank_order(counter, [2, 1, 1, 1])
+    return (0, "High Card"), values
+
+def get_rank_order(counter, pattern):
+    ordered = []
+    for count in pattern:
+        for val, cnt in counter.most_common():
+            if cnt == count and val not in ordered:
+                ordered.append(val)
+                break
+    for val in sorted(counter.keys(), reverse=True):
+        if val not in ordered:
+            ordered.append(val)
+    return ordered
+
+def compare_hands(player_score, player_vals, dealer_score, dealer_vals):
+    if player_score > dealer_score:
+        return "player"
+    elif player_score < dealer_score:
+        return "dealer"
+    else:
+        for pv, dv in zip(player_vals, dealer_vals):
+            if pv > dv:
+                return "player"
+            elif pv < dv:
+                return "dealer"
+        return "tie"
+
+def play_hand(player, dealer, deck, buy=True, insurance=True):
+    ante = 1
+    bet = 2
+    payout = 0
+    cost = ante + bet
+
+    dealer_opens = classify_hand(dealer)[0][0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
+
+    insurance_win = not dealer_opens
+    insurance_payout = (bet * 3 if insurance_win else 0) if insurance else 0
+    cost += (bet * 3) if insurance else 0
+
+    dealer_buy = False
+    if not dealer_opens and buy:
+        dealer_buy = True
+        worst = min(dealer, key=lambda c: c.value())
+        dealer.remove(worst)
+        dealer.append(deck.draw(1)[0])
+        dealer_opens = classify_hand(dealer)[0][0] >= 1 or ('A' in [c.rank for c in dealer] and 'K' in [c.rank for c in dealer])
+        cost += ante
+
+    (score_p, combo_p), val_p = classify_hand(player)
+    (score_d, combo_d), val_d = classify_hand(dealer)
+
+    ak_bonus = False
+    second_combo = None
+
+    if not dealer_opens:
+        return {
+            "dealer_opens": False,
+            "dealer_buy": dealer_buy,
+            "winner": "no_show",
+            "player_combo": combo_p,
+            "dealer_combo": "",
+            "dealer_hand": dealer,
+            "ak_bonus": False,
+            "second_combo": None,
+            "insurance_win": insurance_payout,
+            "payout": insurance_payout + ante if not buy else insurance_payout,
+            "cost": cost,
+            "net_gain": insurance_payout + (ante if not buy else 0) - cost
+        }
+
+    winner = compare_hands(score_p, val_p, score_d, val_d)
+
+    if winner == "player":
+        multiplier = [1, 1, 2, 3, 4, 6, 9, 20, 50, 100][score_p]
+        payout = bet * multiplier + ante
+        if 'A' in [c.rank for c in player] and 'K' in [c.rank for c in player] and score_p == 0:
+            ak_bonus = True
+            payout += 1
+    elif winner == "tie":
+        payout = ante
+    else:
+        payout = 0
+
+    net = payout + insurance_payout - cost
+    return {
+        "dealer_opens": dealer_opens,
+        "dealer_buy": dealer_buy,
+        "winner": winner,
+        "player_combo": combo_p,
+        "dealer_combo": combo_d,
+        "dealer_hand": dealer,
+        "ak_bonus": ak_bonus,
+        "second_combo": second_combo,
+        "insurance_win": insurance_payout,
+        "payout": payout + insurance_payout,
+        "cost": cost,
+        "net_gain": net
+    }
 
 # STREAMLIT APP
 
